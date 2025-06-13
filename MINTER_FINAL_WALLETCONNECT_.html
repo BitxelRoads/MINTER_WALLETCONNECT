@@ -1,0 +1,616 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NFT Minter Wizard (Ethers v6)</title>
+  <style>
+    /* --- ESTILOS CSS (Sin cambios, se mantienen igual) --- */
+    @font-face {
+      font-family: 'CustomPixelFont';
+      src: url('https://ipfs.io/ipfs/bafkreihh7twhieryifjepbalj544phswazb3b36oyxnuamlyyrcvjgiyty') format('opentype');
+      font-weight: normal;
+      font-style: normal;
+    }
+    :root {
+      --logo-red: #ff3e3e; --logo-yellow: #ffcc00; --accent-blue: #3e84ff; --bg-dark: #121212; --panel-bg: #1a1a1a; --panel-border: rgba(255, 255, 255, 0.1); --text-primary: #ffffff; --text-secondary: #b0b0b0; --text-highlight: var(--logo-yellow); --success-green: #4caf50; --error-red: #f44336; --disabled-bg: #444; --disabled-text: #888; --hover-scale: 1.03; --active-scale: 0.98; --transition-speed: 0.25s;
+      --accent-blue-rgb: 62, 132, 255;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'CustomPixelFont', 'Courier New', monospace; background-color: transparent; color: var(--text-primary); line-height: 1.6; }
+    #nft-minter-wizard { width: 100%; max-width: 600px; margin: 2em auto; background-color: var(--panel-bg); border-radius: 16px; border: 1px solid var(--panel-border); box-shadow: 0 15px 50px rgba(0, 0, 0, 0.6); overflow: hidden; position: relative; transition: transform 0.3s ease-out; }
+    .minter-container { padding: 32px; }
+    .logo-container { display: block; width: 100%; margin-bottom: 24px; background-color: rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
+    .logo { display: block; width: 100%; height: auto; max-height: 200px; object-fit: contain; }
+    .progress-container { width: 100%; height: 10px; background-color: rgba(255, 255, 255, 0.1); border-radius: 5px; margin-bottom: 32px; overflow: hidden; }
+    .progress-bar { height: 100%; background: linear-gradient(90deg, var(--logo-yellow) 0%, var(--accent-blue) 100%); border-radius: 5px; transition: width 0.5s ease-in-out; width: 0%; box-shadow: 0 0 10px var(--accent-blue), 0 0 5px var(--logo-yellow); }
+    .wizard-content { min-height: 380px; display: flex; flex-direction: column; justify-content: space-between; }
+    .step { display: none; animation: fadeIn 0.4s ease-in-out; flex-grow: 1; width: 100%; }
+    .step.active { display: flex; flex-direction: column; align-items: center; padding: 16px 0; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+    .step-title { font-size: 28px; font-weight: bold; margin-bottom: 20px; text-align: center; color: var(--text-highlight); text-shadow: 0 0 5px var(--logo-yellow); }
+    .step-description { font-size: 17px; text-align: center; margin-bottom: 28px; color: var(--text-secondary); max-width: 90%; }
+    .button { background: linear-gradient(45deg, var(--accent-blue), #58a6ff); color: white; border: none; border-radius: 10px; padding: 14px 28px; font-family: 'CustomPixelFont', 'Courier New', monospace; font-size: 18px; font-weight: bold; cursor: pointer; transition: all var(--transition-speed) ease; position: relative; overflow: hidden; min-width: 180px; margin-top: 16px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); text-shadow: 1px 1px 2px rgba(0,0,0,0.3); }
+    .button-icon { font-size: 1.2em; }
+    .button:hover:not(:disabled) { transform: scale(var(--hover-scale)) translateY(-2px); box-shadow: 0 10px 30px rgba(var(--accent-blue-rgb), 0.6); filter: brightness(1.15); }
+    .button:active:not(:disabled) { transform: scale(var(--active-scale)); box-shadow: 0 4px 15px rgba(var(--accent-blue-rgb), 0.4); filter: brightness(1); }
+    .button:disabled { background: var(--disabled-bg); color: var(--disabled-text); cursor: not-allowed; transform: none; box-shadow: none; opacity: 0.6; }
+    .button.secondary { background: transparent; color: var(--text-secondary); border: 2px solid var(--panel-border); box-shadow: none; text-shadow: none; }
+    .button.secondary:hover:not(:disabled) { background-color: rgba(255, 255, 255, 0.05); color: var(--text-primary); border-color: var(--accent-blue); box-shadow: 0 0 10px rgba(var(--accent-blue-rgb), 0.3); }
+    .button-group { display: flex; justify-content: space-around; width: 100%; margin-top: auto; padding-top: 24px; gap: 20px; }
+    .loading-container { padding: 32px 0; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-grow: 1; }
+    .spinner { width: 40px; height: 40px; border: 4px solid rgba(255, 255, 255, 0.1); border-radius: 50%; border-top: 4px solid var(--accent-blue); animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .loading-text { margin-top: 16px; color: var(--text-secondary); }
+    .error-message { background-color: rgba(244, 67, 54, 0.15); border: 1px solid var(--error-red); border-left-width: 5px; padding: 14px 18px; margin: 20px auto; border-radius: 8px; width: 95%; color: #fcc; text-align: left; word-wrap: break-word; font-size: 15px; }
+    .success-container { width: 100%; display: flex; flex-direction: column; align-items: center; text-align: center; flex-grow: 1; justify-content: center; }
+    .success-icon { width: 72px; height: 72px; background: linear-gradient(135deg, var(--success-green), #66bb6a); box-shadow: 0 0 15px var(--success-green); font-size: 40px; margin-bottom: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; }
+    .success-message { font-size: 20px; font-weight: bold; margin-bottom: 20px; color: #a5d6a7; }
+    .phase-display { background-color: rgba(0, 0, 0, 0.25); padding: 20px 28px; border-radius: 12px; width: 100%; max-width: 450px; display: flex; flex-direction: column; align-items: center; margin-bottom: 16px; border: 1px solid var(--panel-border); transition: all var(--transition-speed) ease; gap: 8px; }
+    .phase-display-row { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .phase-display-row:last-child { border-bottom: none; }
+    .phase-label { font-size: 16px; color: var(--text-secondary); flex-basis: 45%; text-align: left; }
+    .phase-value { font-size: 22px; font-weight: bold; color: var(--text-primary); padding: 4px 10px; border-radius: 6px; background-color: rgba(255,255,255,0.05); transition: all var(--transition-speed) ease; flex-basis: 55%; text-align: right; }
+    .phase-value.small-value { font-size: 18px; font-weight: normal; background-color: transparent; padding: 2px 0px; border: none; color: var(--text-primary); }
+    .phase-display.phase-status-0 .phase-value:not(.small-value), .phase-display.phase-status-5 .phase-value:not(.small-value) { color: var(--error-red); background-color: rgba(244, 67, 54, 0.1); border: 1px solid var(--error-red); }
+    .phase-display.phase-status-1 .phase-value:not(.small-value), .phase-display.phase-status-2 .phase-value:not(.small-value), .phase-display.phase-status-3 .phase-value:not(.small-value), .phase-display.phase-status-4 .phase-value:not(.small-value) { color: var(--logo-yellow); background-color: rgba(255, 204, 0, 0.1); border: 1px solid var(--logo-yellow); }
+    .phase-display.phase-status-loading .phase-value:not(.small-value) { color: var(--text-secondary); background-color: rgba(255, 255, 255, 0.05); border: 1px solid var(--panel-border); animation: pulse 1.5s infinite ease-in-out; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    #phase-active-value.status-active { color: var(--success-green); font-weight: bold; }
+    #phase-active-value.status-inactive { color: var(--error-red); }
+    #phase-active-value.status-ended-time, #phase-active-value.status-ended-supply { color: var(--logo-yellow); }
+    .phase-message { text-align: center; margin-top: 16px; margin-bottom: 20px; font-size: 15px; color: var(--text-secondary); width: 100%; max-width: 95%; }
+    .quantity-selector { display: flex; align-items: center; margin-bottom: 24px; background-color: rgba(0,0,0,0.15); padding: 10px; border-radius: 12px; }
+    .quantity-button { width: 44px; height: 44px; border-radius: 10px; background-color: rgba(255, 255, 255, 0.1); color: var(--text-primary); font-size: 24px; font-weight: bold; border: none; transition: all var(--transition-speed) ease; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .quantity-button:hover:not(:disabled) { background-color: rgba(255, 255, 255, 0.2); transform: scale(1.1); }
+    .quantity-button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .quantity-input { width: 70px; height: 44px; text-align: center; margin: 0 16px; background-color: rgba(255, 255, 255, 0.05); border: 1px solid var(--panel-border); border-radius: 10px; color: var(--text-primary); font-size: 20px; font-family: 'CustomPixelFont', 'Courier New', monospace; }
+    .quantity-input::-webkit-inner-spin-button, .quantity-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    .price-info { width: 100%; max-width: 450px; margin-bottom: 24px; background-color: rgba(0,0,0,0.1); padding: 16px 20px; border-radius: 12px; }
+    .price-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+    .price-row:last-child { border-bottom: none; }
+    .total-row { font-weight: bold; font-size: 18px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.2); }
+    .supply-info { width: 100%; max-width: 450px; margin-bottom: 24px; background-color: rgba(0,0,0,0.1); padding: 16px 20px; border-radius: 12px; }
+    .supply-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+    .supply-row:last-child { border-bottom: none; }
+    .supply-info span:first-child { color: var(--text-secondary); }
+    .supply-info span:last-child { font-weight: bold; }
+    .confirmation-details { width: 100%; max-width: 400px; background-color: rgba(0, 0, 0, 0.2); padding: 16px; border-radius: 8px; margin-bottom: 24px; }
+    .confirm-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+    .confirm-row:last-child { border-bottom: none; }
+    .confirm-row span:first-child { color: var(--text-secondary); }
+    .confirm-row span:last-child { font-weight: bold; }
+    .transaction-info { background-color: rgba(0, 0, 0, 0.2); padding: 12px; border-radius: 8px; width: 100%; max-width: 400px; margin-bottom: 24px; word-break: break-all; }
+    .tx-link { color: var(--accent-blue); text-decoration: underline; display: block; margin-top: 4px; font-family: monospace; }
+    .retry-button { display: inline-block; margin-left: 16px; background-color: var(--error-red); color: white; padding: 4px 8px; border-radius: 4px; border: none; cursor: pointer; font-size: 12px; }
+    @media (max-width: 640px) { #nft-minter-wizard { border-radius: 0; margin: 0; max-width: 100%; border: none; } .minter-container { padding: 20px; } .logo { max-height: 150px; } .step-title { font-size: 22px; } .step-description { font-size: 15px; } .button { padding: 12px 24px; font-size: 16px; } .button-group { flex-direction: column; } .button { width: 100%; } .phase-display, .price-info, .supply-info, .confirmation-details, .transaction-info { max-width: 100%; } }
+    #nft-minter-wizard.loading { cursor: wait; }
+    #nft-minter-wizard.loading * { pointer-events: none; }
+    #nft-minter-wizard.loading .spinner-overlay { display: flex; }
+    .spinner-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(26, 26, 26, 0.85); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 10; border-radius: 16px; backdrop-filter: blur(3px); }
+    .spinner-overlay .spinner { }
+    .spinner-overlay .loading-text { margin-top: 16px; color: var(--text-secondary); font-size: 16px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div id="nft-minter-wizard"
+       data-contract-address="0x81980291d4df5eC025CDd6C05B51cf0546f0268e"
+       data-abi='[{"inputs":[{"internalType":"address","name":"_treasury","type":"address"},{"internalType":"string","name":"_placeholderURI","type":"string"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"ApprovalCallerNotOwnerNorApproved","type":"error"},{"inputs":[],"name":"ApprovalQueryForNonexistentToken","type":"error"},{"inputs":[],"name":"BalanceQueryForZeroAddress","type":"error"},{"inputs":[],"name":"MintERC2309QuantityExceedsLimit","type":"error"},{"inputs":[],"name":"MintToZeroAddress","type":"error"},{"inputs":[],"name":"MintZeroQuantity","type":"error"},{"inputs":[],"name":"NotCompatibleWithSpotMints","type":"error"},{"inputs":[],"name":"OwnerQueryForNonexistentToken","type":"error"},{"inputs":[],"name":"OwnershipNotInitializedForExtraData","type":"error"},{"inputs":[],"name":"SequentialMintExceedsLimit","type":"error"},{"inputs":[],"name":"SequentialUpToTooSmall","type":"error"},{"inputs":[],"name":"SpotMintTokenIdTooSmall","type":"error"},{"inputs":[],"name":"TokenAlreadyExists","type":"error"},{"inputs":[],"name":"TransferCallerNotOwnerNorApproved","type":"error"},{"inputs":[],"name":"TransferFromIncorrectOwner","type":"error"},{"inputs":[],"name":"TransferToNonERC721ReceiverImplementer","type":"error"},{"inputs":[],"name":"TransferToZeroAddress","type":"error"},{"inputs":[],"name":"URIQueryForNonexistentToken","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":true,"internalType":"address","name":"approved","type":"address"},{"indexed":true,"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"Approval","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":true,"internalType":"address","name":"operator","type":"address"},{"indexed":false,"internalType":"bool","name":"approved","type":"bool"}],"name":"ApprovalForAll","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"string","name":"newURI","type":"string"}],"name":"BaseURISet","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"fromTokenId","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"toTokenId","type":"uint256"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"}],"name":"ConsecutiveTransfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address[]","name":"addresses","type":"address[]"}],"name":"FCFSListAdded","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address[]","name":"addresses","type":"address[]"}],"name":"GTDListAdded","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"minter","type":"address"},{"indexed":false,"internalType":"uint256","name":"quantity","type":"uint256"}],"name":"MintExecuted","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newPhase","type":"uint256"}],"name":"MintPhaseChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address[]","name":"addresses","type":"address[]"}],"name":"OGListAdded","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"minter","type":"address"},{"indexed":false,"internalType":"uint256","name":"quantity","type":"uint256"}],"name":"OwnerMintExecuted","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"account","type":"address"}],"name":"Paused","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"string","name":"newURI","type":"string"}],"name":"PlaceholderURISet","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newPrice","type":"uint256"}],"name":"PriceFCFSUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newPrice","type":"uint256"}],"name":"PricePublicUpdated","type":"event"},{"anonymous":false,"inputs":[],"name":"Revealed","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"newReceiver","type":"address"},{"indexed":false,"internalType":"uint96","name":"newFeeNumerator","type":"uint96"}],"name":"RoyaltyUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":true,"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"Transfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"newTreasury","type":"address"}],"name":"TreasuryUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"account","type":"address"}],"name":"Unpaused","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"recipient","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"WithdrawExecuted","type":"event"},{"inputs":[],"name":"FCFS_MAX_SUPPLY","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"GTD_MAX_SUPPLY","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"MAX_SUPPLY","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"OG_MAX_SUPPLY","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"PHASE_DURATION","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"approve","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"currentPhase","outputs":[{"internalType":"enum BitxelRoads.MintPhase","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"getApproved","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"getPhaseStatus","outputs":[{"internalType":"bool","name":"isActive","type":"bool"},{"internalType":"bool","name":"hasEndedByTime","type":"bool"},{"internalType":"bool","name":"hasEndedBySupply","type":"bool"},{"internalType":"uint256","name":"timeRemaining","type":"uint256"},{"internalType":"uint256","name":"supplyRemaining","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"address","name":"operator","type":"address"}],"name":"isApprovedForAll","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"lockBaseURI","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"quantity","type":"uint256"}],"name":"mint","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"offset","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"offsetBlock","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"quantity","type":"uint256"}],"name":"ownerMint","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"ownerOf","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pause","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"paused","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"enum BitxelRoads.MintPhase","name":"","type":"uint8"}],"name":"phaseEndedByTime","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"enum BitxelRoads.MintPhase","name":"","type":"uint8"}],"name":"phaseStartTime","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"priceFCFS","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pricePublic","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"reveal","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"revealed","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"},{"internalType":"uint256","name":"salePrice","type":"uint256"}],"name":"royaltyInfo","outputs":[{"internalType":"address","name":"","type":"address"},{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"safeTransferFrom","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"tokenId","type":"uint256"},{"internalType":"bytes","name":"_data","type":"bytes"}],"name":"safeTransferFrom","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"operator","type":"address"},{"internalType":"bool","name":"approved","type":"bool"}],"name":"setApprovalForAll","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"string","name":"uri","type":"string"}],"name":"setBaseURI","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"receiver","type":"address"},{"internalType":"uint96","name":"feeNumerator","type":"uint96"}],"name":"setDefaultRoyalty","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address[]","name":"addresses","type":"address[]"}],"name":"setFCFSList","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address[]","name":"addresses","type":"address[]"}],"name":"setGTDList","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"phase","type":"uint256"}],"name":"setMintPhase","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address[]","name":"addresses","type":"address[]"}],"name":"setOGList","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"setOffset","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"string","name":"uri","type":"string"}],"name":"setPlaceholderURI","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"_price","type":"uint256"}],"name":"setPriceFCFS","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"_price","type":"uint256"}],"name":"setPricePublic","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newTreasury","type":"address"}],"name":"setTreasury","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes4","name":"interfaceId","type":"bytes4"}],"name":"supportsInterface","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"tokenURI","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256","name":"result","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"transferFrom","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"unpause","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"withdraw","outputs":[],"stateMutability":"nonpayable","type":"function"}]'
+       data-ipfs-font-cid="bafkreihh7twhieryifjepbalj544phswazb3b36oyxnuamlyyrcvjgiyty"
+       data-logo-cid="bafybeifykxk25w3rxlfmeywqjtdu6yfkk7e2tfd53zzzvkw3xpypejnju4"
+       data-chain-explorer-url="https://basescan.org/tx/"
+       data-max-quantity="4"
+       data-expected-chain-id="0x2105">
+    
+    <div class="minter-container">
+      <div class="logo-container"></div>
+      <div class="progress-container">
+        <div class="progress-bar"></div>
+      </div>
+      <div class="wizard-content">
+        <!-- Step 1: Connect Wallet (Actualizado para 2025) -->
+        <div class="step active" id="step-connect-wallet">
+            <h2 class="step-title">1. Choose Your Wallet</h2>
+            <p class="step-description">
+                Connect with your favorite browser wallet or use WalletConnect for mobile apps. Ensure you are on the Base Mainnet.
+            </p>
+            <button class="button" id="connect-wallet-button">
+                <span class="button-icon">🔗</span> Connect Wallet
+            </button>
+            <div class="error-message" id="connect-error" style="display: none;"></div>
+            <div class="button-group" style="visibility: hidden; height: 60px;"></div>
+        </div>
+
+        <!-- Step 2: Mint Phase -->
+        <div class="step" id="step-mint-phase">
+            <h2 class="step-title">2. Check Mint Phase</h2>
+            <div class="phase-display" id="phase-display-container">
+                <div class="phase-display-row">
+                    <span class="phase-label">Current Phase:</span>
+                    <span class="phase-value" id="phase-value">Loading...</span>
+                </div>
+                <div class="phase-display-row" id="phase-price-row" style="display: none;">
+                    <span class="phase-label">Price:</span>
+                    <span class="phase-value small-value" id="phase-price-value"></span>
+                </div>
+                <div class="phase-display-row" id="phase-active-row" style="display: none;">
+                    <span class="phase-label">Status:</span>
+                    <span class="phase-value small-value" id="phase-active-value"></span>
+                </div>
+                <div class="phase-display-row" id="phase-supply-row" style="display: none;">
+                    <span class="phase-label">Phase Supply Left:</span>
+                    <span class="phase-value small-value" id="phase-supply-value"></span>
+                </div>
+                <div class="phase-display-row" id="phase-timer-row" style="display: none;">
+                    <span class="phase-label">Time Remaining:</span>
+                    <span class="phase-value small-value" id="phase-timer-value"></span>
+                </div>
+            </div>
+            <p class="phase-message" id="phase-message">Checking the current mint phase... please wait.</p>
+            <div class="error-message" id="phase-error" style="display: none;"></div>
+            <div class="button-group">
+                <button class="button secondary" id="phase-back-button"><span class="button-icon">⬅️</span> Disconnect</button>
+                <button class="button" id="phase-continue-button" disabled>Continue <span class="button-icon">➡️</span></button>
+            </div>
+        </div>
+
+        <!-- Step 3: Choose Quantity -->
+        <div class="step" id="step-choose-quantity">
+            <h2 class="step-title">3. Choose Quantity</h2>
+            <p class="step-description">Select how many NFTs you want to mint (Max: <span id="max-quantity-display">4</span>).</p>
+            <div class="supply-info">
+                <div class="supply-row"><span>Minted:</span><span id="supply-minted">Loading...</span></div>
+                <div class="supply-row"><span>Total Collection Supply:</span><span id="supply-total">Loading...</span></div>
+            </div>
+            <div class="quantity-selector">
+                <button class="quantity-button" id="decrease-quantity">-</button>
+                <input type="number" min="1" max="4" value="1" id="quantity-input" class="quantity-input" aria-label="NFT Quantity"/>
+                <button class="quantity-button" id="increase-quantity">+</button>
+            </div>
+            <div class="price-info">
+                <div class="price-row"><span>Price per NFT:</span><span id="price-per-nft">Loading...</span></div>
+                <div class="price-row"><span>Selected Quantity:</span><span id="quantity-display">1</span></div>
+                <div class="price-row total-row"><span>Total Cost:</span><span id="total-cost">Calculating...</span></div>
+            </div>
+            <div class="error-message" id="quantity-error" style="display: none;"></div>
+            <div class="button-group">
+                <button class="button secondary" id="quantity-back-button"><span class="button-icon">⬅️</span> Back</button>
+                <button class="button" id="quantity-continue-button">Review & Mint <span class="button-icon">➡️</span></button>
+            </div>
+        </div>
+
+        <!-- Step 4: Confirm & Mint -->
+        <div class="step" id="step-confirm-mint">
+            <h2 class="step-title" id="confirm-title">4. Confirm & Mint</h2>
+            <div style="width: 100%; display: flex; flex-direction: column; align-items: center; flex-grow: 1; justify-content: center;">
+                <div id="confirm-details" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
+                    <p class="step-description" id="confirm-description">Review your mint details below.</p>
+                    <div class="confirmation-details">
+                        <div class="confirm-row"><span>Quantity:</span><span id="confirm-quantity">1</span></div>
+                        <div class="confirm-row"><span>Total Cost:</span><span id="confirm-cost">Calculating...</span></div>
+                        <div class="confirm-row"><span>Network:</span><span id="confirm-network">Connecting...</span></div>
+                        <div class="confirm-row"><span>Wallet:</span><span id="confirm-wallet">0x...</span></div>
+                    </div>
+                </div>
+                <div class="loading-container" id="minting-loader" style="display: none;">
+                    <div class="spinner"></div>
+                    <p class="loading-text" id="mint-loading-text">Processing transaction...</p>
+                    <p class="loading-text" style="font-size: 14px; opacity: 0.7;">Please confirm in your wallet</p>
+                </div>
+                <div class="success-container" id="mint-success" style="display: none;">
+                    <div class="success-icon">✓</div>
+                    <p class="success-message" id="success-message">Successfully minted!</p>
+                    <div class="transaction-info">
+                        <p>Transaction Confirmed:</p>
+                        <a href="#" target="_blank" rel="noopener noreferrer" class="tx-link" id="tx-link">View on Explorer</a>
+                    </div>
+                </div>
+                <div class="error-message" id="mint-error" style="display: none;"><button class="retry-button" id="retry-button" style="display:none">Try Again</button></div>
+            </div>
+            <div class="button-group" id="confirm-buttons">
+                <button class="button secondary" id="confirm-back-button"><span class="button-icon">⬅️</span> Edit Quantity</button>
+                <button class="button" id="mint-button"><span class="button-icon">💎</span> Mint Now!</button>
+            </div>
+            <div class="button-group" id="success-buttons" style="display:none">
+                <button class="button" id="mint-more-button">Start New Mint <span class="button-icon">✨</span></button>
+            </div>
+        </div>
+      </div>
+       <div class="spinner-overlay">
+           <div class="spinner"></div>
+           <div class="loading-text" id="global-loading-text">Loading...</div>
+       </div>
+    </div>
+  </div>
+
+  <!-- === LIBRERÍAS ACTUALIZADAS (Ethers v6 + Web3Modal) === -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.1/dist/ethers.umd.min.js" type="application/javascript"></script>
+  <script type="module">
+    import { createWeb3Modal, ethers5Adapter } from 'https://cdn.jsdelivr.net/npm/@web3modal/ethers5@4.1.1/dist/esm/index.js';
+    
+    /**
+     * NFT Minter Wizard - VERSIÓN CORREGIDA (Ethers v6 + Web3Modal)
+     */
+    (function() {
+      // Usaremos una IIFE asíncrona para poder usar `await` a nivel superior
+      async function main() {
+        console.log("Ethers v6 y Web3Modal cargados.");
+
+        const defaultConfig = {
+          contractAddress: '', abi: [], ipfsFontCid: '', logoCid: '',
+          chainExplorerUrl: 'https://basescan.org/tx/',
+          maxQuantity: 10,
+          expectedChainId: '0x2105'
+        };
+
+        // Estado global de la aplicación
+        let state = {
+          config: { ...defaultConfig }, step: 'connect-wallet', provider: null, signer: null, contract: null, account: '',
+          phase: null, price: null, quantity: 1, totalCost: null, txHash: '', error: '', isLoading: false,
+          currentNetwork: null, maxSupply: null, mintedCount: null,
+          web3Modal: null
+        };
+        
+        const PHASE_NAMES = ['0: Setup','1: OG','2: GTD','3: FCFS','4: Public', '5: Finished'];
+        const MINTABLE_PHASES = [1, 2, 3, 4];
+        let phaseCountdownInterval = null;
+
+        const elements = {
+          wizard: document.getElementById('nft-minter-wizard'), progressBar: document.querySelector('.progress-bar'), logoContainer: document.querySelector('.logo-container'),
+          steps: { connectWallet: document.getElementById('step-connect-wallet'), mintPhase: document.getElementById('step-mint-phase'), chooseQuantity: document.getElementById('step-choose-quantity'), confirmMint: document.getElementById('step-confirm-mint') },
+          buttons: { connectWallet: document.getElementById('connect-wallet-button'), phaseBack: document.getElementById('phase-back-button'), phaseContinue: document.getElementById('phase-continue-button'), quantityBack: document.getElementById('quantity-back-button'), quantityContinue: document.getElementById('quantity-continue-button'), confirmBack: document.getElementById('confirm-back-button'), mint: document.getElementById('mint-button'), mintMore: document.getElementById('mint-more-button'), retry: document.getElementById('retry-button'), decreaseQuantity: document.getElementById('decrease-quantity'), increaseQuantity: document.getElementById('increase-quantity') },
+          inputs: { quantity: document.getElementById('quantity-input') },
+          displays: { phase: document.getElementById('phase-value'), phasePriceRow: document.getElementById('phase-price-row'), phasePriceValue: document.getElementById('phase-price-value'), phaseActiveRow: document.getElementById('phase-active-row'), phaseActiveValue: document.getElementById('phase-active-value'), phaseSupplyRow: document.getElementById('phase-supply-row'), phaseSupplyValue: document.getElementById('phase-supply-value'), phaseTimerRow: document.getElementById('phase-timer-row'), phaseTimerValue: document.getElementById('phase-timer-value'), phaseMessage: document.getElementById('phase-message'), pricePerNft: document.getElementById('price-per-nft'), quantityDisplay: document.getElementById('quantity-display'), totalCost: document.getElementById('total-cost'), confirmTitle: document.getElementById('confirm-title'), confirmDescription: document.getElementById('confirm-description'), confirmQuantity: document.getElementById('confirm-quantity'), confirmCost: document.getElementById('confirm-cost'), confirmNetwork: document.getElementById('confirm-network'), confirmWallet: document.getElementById('confirm-wallet'), successMessage: document.getElementById('success-message'), txLink: document.getElementById('tx-link'), maxQuantityDisplay: document.getElementById('max-quantity-display'), supplyMinted: document.getElementById('supply-minted'), supplyTotal: document.getElementById('supply-total') },
+          containers: { phaseDisplayContainer: document.getElementById('phase-display-container'), confirmDetails: document.getElementById('confirm-details'), mintingLoader: document.getElementById('minting-loader'), mintLoadingText: document.getElementById('mint-loading-text'), mintSuccess: document.getElementById('mint-success'), mintErrorContainer: document.getElementById('mint-error'), confirmButtons: document.getElementById('confirm-buttons'), successButtons: document.getElementById('success-buttons') },
+          errors: { connectWallet: document.getElementById('connect-error'), mintPhase: document.getElementById('phase-error'), chooseQuantity: document.getElementById('quantity-error'), confirmMint: document.getElementById('mint-error') },
+          overlays: { spinner: document.querySelector('.spinner-overlay'), spinnerText: document.getElementById('global-loading-text') }
+        };
+
+        // --- Lógica de Conexión (Ethers v6 + Web3Modal) ---
+        function initializeWeb3Modal() {
+          if (state.web3Modal) return;
+
+          const projectId = 'd21a97e59a85055cb585dc8f534898ff'; // <-- ¡REEMPLAZA ESTO CON TU PROJECT ID!
+          if (projectId === 'd21a97e59a85055cb585dc8f534898ff') {
+              console.error("CONFIGURACIÓN NECESARIA: Debes obtener un projectId de WalletConnect Cloud.");
+              showError("Configuración del desarrollador incompleta.", 'connectWallet');
+              return;
+          }
+          
+          const baseMainnet = {
+              chainId: 8453,
+              name: 'Base',
+              currency: 'ETH',
+              explorerUrl: 'https://basescan.org',
+              rpcUrl: 'https://mainnet.base.org'
+          };
+          
+          const metadata = {
+              name: 'NFT Minter Wizard',
+              description: 'Un wizard avanzado para mintear NFTs en Base',
+              url: window.location.href,
+              icons: [elements.logoContainer.querySelector('img')?.src || 'https://ipfs.io/ipfs/bafybeifykxk25w3rxlfmeywqjtdu6yfkk7e2tfd53zzzvkw3xpypejnju4']
+          };
+
+          state.web3Modal = createWeb3Modal({
+            ethersConfig: ethers5Adapter({
+              ethers,
+              metadata
+            }),
+            chains: [baseMainnet],
+            projectId,
+            enableAnalytics: true,
+            themeMode: 'dark',
+            themeVariables: {
+              '--w3m-font-family': "'CustomPixelFont', 'Courier New', monospace",
+              '--w3m-accent': 'var(--accent-blue)',
+              '--w3m-color-mix': 'var(--bg-dark)',
+            }
+          });
+          state.web3Modal.subscribeProvider(onProviderChange);
+        }
+
+        async function onProviderChange({ provider, providerType, address, chainId, isConnected }) {
+          if (isConnected) {
+            if (chainId !== state.config.expectedChainIdDecimal) {
+              showError(`Red Incorrecta. Por favor, cambia a Base Mainnet (ID: ${state.config.expectedChainIdDecimal}).`, 'connectWallet');
+              await disconnectWallet();
+              return;
+            }
+            
+            const ethersProvider = new ethers.BrowserProvider(provider);
+            const signer = await ethersProvider.getSigner();
+            const contract = new ethers.Contract(state.config.contractAddress, state.config.abi, signer);
+            
+            state.provider = ethersProvider;
+            state.signer = signer;
+            state.account = address;
+            state.currentNetwork = { chainId: chainId, name: 'Base Mainnet' };
+            state.contract = contract;
+
+            console.log("Wallet conectada con éxito:", address);
+            showStep('mint-phase');
+          } else {
+            console.log("Desconectado.");
+            resetState(true);
+            showStep('connect-wallet');
+          }
+        }
+
+        function connectWallet() { state.web3Modal?.open(); }
+        async function disconnectWallet() { await state.web3Modal?.disconnect(); }
+
+        // --- Lógica Principal de la Aplicación ---
+        function initMinter(config) {
+          state.config = { ...defaultConfig, ...config };
+          state.config.expectedChainIdDecimal = parseInt(state.config.expectedChainId || '0', 16);
+          if (!ethers.isAddress(state.config.contractAddress)) {
+            showError("Config error: Invalid contract address.", 'connectWallet'); return;
+          }
+          if (!Array.isArray(state.config.abi) || state.config.abi.length === 0) {
+            showError("Config error: Invalid ABI.", 'connectWallet'); return;
+          }
+          loadCustomFont(state.config.ipfsFontCid);
+          loadLogo(state.config.logoCid);
+          elements.inputs.quantity.max = state.config.maxQuantity;
+          elements.displays.maxQuantityDisplay.textContent = state.config.maxQuantity;
+          
+          initializeWeb3Modal();
+          attachEventListeners();
+          showStep('connect-wallet');
+        }
+
+        function attachEventListeners() {
+            elements.buttons.connectWallet?.addEventListener('click', connectWallet);
+            elements.buttons.phaseBack?.addEventListener('click', disconnectWallet);
+            elements.buttons.phaseContinue?.addEventListener('click', () => !elements.buttons.phaseContinue.disabled && showStep('choose-quantity'));
+            elements.buttons.quantityBack?.addEventListener('click', () => showStep('mint-phase'));
+            elements.buttons.quantityContinue?.addEventListener('click', () => !elements.buttons.quantityContinue.disabled && showStep('confirm-mint'));
+            elements.buttons.decreaseQuantity?.addEventListener('click', decreaseQuantity);
+            elements.buttons.increaseQuantity?.addEventListener('click', increaseQuantity);
+            elements.inputs.quantity?.addEventListener('input', updateQuantity);
+            elements.buttons.confirmBack?.addEventListener('click', () => showStep('choose-quantity'));
+            elements.buttons.mint?.addEventListener('click', mint);
+            elements.buttons.retry?.addEventListener('click', mint);
+            elements.buttons.mintMore?.addEventListener('click', () => {
+                resetState(false);
+                showStep('mint-phase');
+            });
+        }
+        
+        async function fetchPhase() {
+            if (!state.contract) { showError("Connection lost.", 'mintPhase'); showStep('connect-wallet'); return; }
+            clearErrors();
+            setLoading(true, "Checking mint status...");
+            elements.buttons.phaseContinue.disabled = true;
+
+            state.phase = null; state.price = null; state.mintedCount = null; state.maxSupply = null;
+            let phaseStatusData = null;
+            updatePhaseDisplay();
+
+            try {
+                const [phaseBigInt, price, mintedData, maxSupplyData, status] = await Promise.all([
+                    state.contract.currentPhase(),
+                    state.contract.pricePublic(), // Asumimos una función de precio, ajustar si es necesario
+                    state.contract.totalSupply(),
+                    state.contract.MAX_SUPPLY(),
+                    state.contract.getPhaseStatus()
+                ]);
+
+                state.phase = Number(phaseBigInt);
+                state.price = price;
+                state.mintedCount = mintedData;
+                state.maxSupply = maxSupplyData;
+                phaseStatusData = status;
+
+                const canContinue = phaseStatusData.isActive && state.price >= 0n && !phaseStatusData.hasEndedBySupply && !phaseStatusData.hasEndedByTime;
+                elements.buttons.phaseContinue.disabled = !canContinue;
+            } catch (error) {
+                console.error('Error fetching contract data:', error);
+                showError(extractErrorMessage(error, 'Failed to fetch contract data.'), 'mintPhase');
+            } finally {
+                updatePhaseDisplay(phaseStatusData);
+                updatePriceDisplay();
+                updateSupplyDisplay();
+                updateQuantityDisplay();
+                setLoading(false);
+            }
+        }
+        
+        async function mint() {
+          if (!state.contract || state.totalCost === null || state.isLoading) return;
+          clearErrors();
+          setLoading(true, "Preparing mint...");
+          showMintingState('loading');
+          try {
+              const tx = await state.contract.mint(state.quantity, { value: state.totalCost });
+              state.txHash = tx.hash;
+              showMintingState('processing', tx.hash);
+              await tx.wait(1);
+              showMintingState('success');
+              await fetchPhase();
+          } catch (error) {
+              console.error('Error minting NFT:', error);
+              showMintingState('error', extractErrorMessage(error, 'Failed to mint NFT.'));
+          }
+        }
+
+        // --- INICIO DE FUNCIONES AUXILIARES (NO MINIFICADAS) ---
+
+        function readConfigFromAttributes() {
+            const container = document.getElementById('nft-minter-wizard');
+            const config = { ...defaultConfig };
+            if (!container) { console.error("Minter container #nft-minter-wizard not found!"); return config; }
+            const dataset = container.dataset;
+            if (dataset.contractAddress) config.contractAddress = dataset.contractAddress;
+            if (dataset.abi) { try { const parsedAbi = JSON.parse(dataset.abi); if (Array.isArray(parsedAbi)) { config.abi = parsedAbi; } } catch (e) { console.error('Failed to parse ABI:', e); } }
+            if (dataset.ipfsFontCid) config.ipfsFontCid = dataset.ipfsFontCid;
+            if (dataset.logoCid) config.logoCid = dataset.logoCid;
+            if (dataset.chainExplorerUrl) config.chainExplorerUrl = dataset.chainExplorerUrl.endsWith('/') ? dataset.chainExplorerUrl : dataset.chainExplorerUrl + '/';
+            if (dataset.maxQuantity) config.maxQuantity = parseInt(dataset.maxQuantity, 10) || defaultConfig.maxQuantity;
+            if (dataset.expectedChainId) config.expectedChainId = dataset.expectedChainId;
+            return config;
+        }
+        function loadCustomFont(cid) { const fontUrl = resolveIpfsUrl(cid); if (!fontUrl) return; const fontFace = new FontFace('CustomPixelFont', `url(${fontUrl}) format('opentype')`); fontFace.load().then(loadedFont => document.fonts.add(loadedFont)).catch(error => console.error('Error loading custom font:', error)); }
+        function loadLogo(cid) { const logoUrl = resolveIpfsUrl(cid); if (!logoUrl) return; const logoImg = document.createElement('img'); logoImg.src = logoUrl; logoImg.alt = 'Project Logo'; logoImg.className = 'logo'; elements.logoContainer.innerHTML = ''; elements.logoContainer.appendChild(logoImg); }
+        function resolveIpfsUrl(cid) { if (!cid) return ''; if (cid.startsWith('http')) return cid; if (cid.startsWith('ipfs://')) cid = cid.substring(7); if (cid.includes('/ipfs/')) cid = cid.split('/ipfs/')[1]; return `https://ipfs.io/ipfs/${cid}`; }
+        function resetState(fullReset = false) {
+            if(phaseCountdownInterval) clearInterval(phaseCountdownInterval);
+            const { config, web3Modal } = state;
+            state = { config, web3Modal, step: 'connect-wallet', provider: null, signer: null, contract: null, account: '', currentNetwork: null, phase: null, price: null, quantity: 1, totalCost: null, txHash: '', error: '', isLoading: false, maxSupply: null, mintedCount: null };
+            if (fullReset) {
+              state.step = 'connect-wallet';
+            }
+            elements.inputs.quantity.value = 1;
+            showMintingState("default");
+            updateQuantityDisplay();
+            updatePhaseDisplay();
+            updateSupplyDisplay();
+            clearErrors();
+            updateProgress();
+            setLoading(false);
+        }
+        function showStep(stepName) {
+            clearErrors();
+            state.step = stepName;
+            Object.keys(elements.steps).forEach(key => {
+                elements.steps[key]?.classList.toggle('active', camelCase(stepName) === key);
+            });
+            updateProgress();
+            if (stepName === 'mint-phase' && state.contract) fetchPhase();
+            else if (stepName === 'choose-quantity' && !state.contract) showStep('connect-wallet');
+            else if (stepName === 'confirm-mint') updateConfirmationDetails();
+        }
+        function updateProgress() { const progressMap = { 'connect-wallet': 0, 'mint-phase': 33, 'choose-quantity': 66, 'confirm-mint': 100 }; elements.progressBar.style.width = `${progressMap[state.step] || 0}%`; }
+        function startPhaseCountdown(durationInSeconds) {
+            if(phaseCountdownInterval) clearInterval(phaseCountdownInterval);
+            let timer = durationInSeconds;
+            const update = () => {
+                if (timer < 0) {
+                    clearInterval(phaseCountdownInterval);
+                    elements.displays.phaseTimerValue.textContent = "Ended";
+                    return;
+                }
+                const d = Math.floor(timer / 86400);
+                const h = Math.floor(timer % 86400 / 3600).toString().padStart(2,'0');
+                const m = Math.floor(timer % 3600 / 60).toString().padStart(2,'0');
+                const s = Math.floor(timer % 60).toString().padStart(2,'0');
+                elements.displays.phaseTimerValue.textContent = (d > 0 ? `${d}d ` : '') + `${h}:${m}:${s}`;
+                timer--;
+            };
+            update();
+            phaseCountdownInterval = setInterval(update, 1000);
+        }
+        function updatePhaseDisplay(status = null) {
+            const { phase } = state;
+            const phaseName = getPhaseName(phase);
+            const container = elements.containers.phaseDisplayContainer;
+            if (!container) return;
+
+            ['phasePriceRow', 'phaseActiveRow', 'phaseSupplyRow', 'phaseTimerRow'].forEach(id => elements.displays[id].style.display = 'none');
+            if (phaseCountdownInterval) clearInterval(phaseCountdownInterval);
+
+            container.className = 'phase-display';
+            container.classList.add(phase !== null ? `phase-status-${phase}` : 'phase-status-loading');
+            elements.displays.phase.textContent = phaseName;
+            
+            let message = 'Loading status...';
+            if (phase === null) { elements.displays.phaseMessage.textContent = message; return; }
+            
+            if (state.price >= 0n && MINTABLE_PHASES.includes(phase)) {
+                elements.displays.phasePriceRow.style.display = 'flex';
+                elements.displays.phasePriceValue.textContent = formatEth(state.price) + (state.price === 0n ? " (FREE)" : "");
+            }
+            if (status) {
+                elements.displays.phaseActiveRow.style.display = 'flex';
+                const activeEl = elements.displays.phaseActiveValue;
+                activeEl.className = 'phase-value small-value';
+                if (status.isActive && !status.hasEndedByTime && !status.hasEndedBySupply) {
+                    activeEl.textContent = "ACTIVE"; activeEl.classList.add('status-active'); message = `${phaseName} Mint is ACTIVE!`;
+                } else {
+                    activeEl.textContent = "INACTIVE"; activeEl.classList.add('status-inactive'); message = `${phaseName} Mint is INACTIVE.`;
+                    if (status.hasEndedByTime) { activeEl.textContent = "ENDED (Time)"; activeEl.classList.add('status-ended-time'); message = `${phaseName} Mint has ended.`; }
+                    else if (status.hasEndedBySupply) { activeEl.textContent = "ENDED (Supply)"; activeEl.classList.add('status-ended-supply'); message = `${phaseName} Mint is sold out.`; }
+                }
+                if (status.supplyRemaining >= 0n && MINTABLE_PHASES.includes(phase)) {
+                    elements.displays.phaseSupplyRow.style.display = 'flex';
+                    elements.displays.phaseSupplyValue.textContent = status.supplyRemaining.toString();
+                }
+                if (status.isActive && !status.hasEndedByTime && !status.hasEndedBySupply && status.timeRemaining > 0n) {
+                    elements.displays.phaseTimerRow.style.display = 'flex';
+                    startPhaseCountdown(Number(status.timeRemaining));
+                }
+            }
+            elements.displays.phaseMessage.textContent = message;
+        }
+        function getPhaseName(phase) { return phase === null ? 'Loading...' : (PHASE_NAMES[phase] || `Unknown Phase (${phase})`); }
+        function updateSupplyDisplay() { elements.displays.supplyMinted.textContent = state.mintedCount?.toString() ?? '...'; elements.displays.supplyTotal.textContent = state.maxSupply?.toString() ?? '...'; }
+        function decreaseQuantity() { let val = parseInt(elements.inputs.quantity.value); if (val > 1) { elements.inputs.quantity.value = val - 1; updateQuantity(); } }
+        function increaseQuantity() { let val = parseInt(elements.inputs.quantity.value); const max = parseInt(elements.inputs.quantity.max); if (val < max) { elements.inputs.quantity.value = val + 1; updateQuantity(); } }
+        function updateQuantity() { let value = parseInt(elements.inputs.quantity.value); const min = parseInt(elements.inputs.quantity.min); const max = parseInt(elements.inputs.quantity.max); value = Math.max(min, Math.min(max, isNaN(value) ? min : value)); elements.inputs.quantity.value = value; state.quantity = value; updateQuantityDisplay(); }
+        function formatEth(amount, decimals = 4) { if (typeof amount !== 'bigint') return '? ETH'; const formatted = ethers.formatEther(amount); const num = Number(formatted); const effectiveDecimals = num > 0 && num < 0.0001 ? 8 : decimals; return `${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: effectiveDecimals })} ETH`; }
+        function updateQuantityDisplay() { elements.displays.quantityDisplay.textContent = state.quantity; state.totalCost = state.price !== null ? state.price * BigInt(state.quantity) : null; updatePriceDisplay(); elements.buttons.quantityContinue.disabled = state.totalCost === null; }
+        function updatePriceDisplay() { elements.displays.pricePerNft.textContent = state.price !== null ? formatEth(state.price) : 'N/A'; elements.displays.totalCost.textContent = state.totalCost !== null ? formatEth(state.totalCost) : 'N/A'; }
+        function updateConfirmationDetails() { elements.displays.confirmQuantity.textContent = state.quantity; elements.displays.confirmCost.textContent = formatEth(state.totalCost); elements.displays.confirmNetwork.textContent = `${state.currentNetwork.name} (${state.currentNetwork.chainId})`; elements.displays.confirmWallet.textContent = `${state.account.substring(0, 6)}...${state.account.substring(state.account.length - 4)}`; }
+        function showMintingState(mintState, detail = '') {
+            setLoading(mintState === 'loading' || mintState === 'processing');
+            ['confirmDetails', 'mintingLoader', 'mintSuccess', 'mintErrorContainer', 'confirmButtons', 'successButtons'].forEach(id => elements.containers[id].style.display = 'none');
+            switch (mintState) {
+                case 'loading': elements.displays.confirmTitle.textContent = 'Processing...'; elements.containers.mintingLoader.style.display = 'flex'; setLoading(true, "Sending to wallet..."); break;
+                case 'processing': elements.displays.confirmTitle.textContent = 'Waiting for Confirmation'; elements.containers.mintingLoader.style.display = 'flex'; setLoading(true, "Waiting for confirmation..."); break;
+                case 'success':
+                    elements.displays.confirmTitle.textContent = 'Mint Successful!';
+                    elements.displays.successMessage.textContent = `Successfully minted ${state.quantity} NFT${state.quantity > 1 ? 's' : ''}!`;
+                    elements.displays.txLink.href = `${state.config.chainExplorerUrl}${state.txHash}`;
+                    elements.containers.mintSuccess.style.display = 'flex';
+                    elements.containers.successButtons.style.display = 'flex';
+                    setLoading(false);
+                    break;
+                case 'error':
+                    elements.displays.confirmTitle.textContent = 'Transaction Failed';
+                    elements.errors.confirmMint.textContent = detail;
+                    elements.containers.mintErrorContainer.style.display = 'block';
+                    elements.buttons.retry.style.display = 'inline-block';
+                    elements.containers.confirmButtons.style.display = 'flex';
+                    setLoading(false);
+                    break;
+                default:
+                    elements.displays.confirmTitle.textContent = '4. Confirm & Mint';
+                    elements.containers.confirmDetails.style.display = 'flex';
+                    elements.containers.confirmButtons.style.display = 'flex';
+                    setLoading(false);
+                    break;
+            }
+        }
+        function setLoading(isLoading, message = 'Loading...') { state.isLoading = isLoading; elements.wizard.classList.toggle('loading', isLoading); elements.overlays.spinner.style.display = isLoading ? 'flex' : 'none'; elements.overlays.spinnerText.textContent = message; Object.values(elements.buttons).forEach(btn => btn.disabled = isLoading); elements.inputs.quantity.disabled = isLoading; }
+        function showError(message, stepKey) { const errorElement = elements.errors[stepKey]; if (errorElement) { errorElement.textContent = message; errorElement.style.display = 'block'; } else console.error(`Cannot display error: ${message}`); }
+        function clearErrors() { Object.values(elements.errors).forEach(el => el.style.display = 'none'); }
+        function extractErrorMessage(error, defaultMessage = 'An unknown error occurred.') {
+            if (!error) return defaultMessage;
+            if (error.shortMessage) return error.shortMessage;
+            if (error.reason) return error.reason;
+            if (error.code === 'ACTION_REJECTED') return 'Transaction rejected by user.';
+            let message = error.message || defaultMessage;
+            if (message.includes('insufficient funds')) return 'Insufficient funds for transaction.';
+            return message.length > 200 ? message.substring(0, 200) + '...' : message;
+        }
+        function camelCase(str) { return str ? str.toLowerCase().replace(/([-_][a-z])/g, g => g.toUpperCase().replace('-', '').replace('_', '')) : ''; }
+        
+        // --- FIN DE FUNCIONES AUXILIARES ---
+
+        // Iniciar la aplicación
+        try {
+            const attributeConfig = readConfigFromAttributes();
+            initMinter(attributeConfig);
+        } catch (initError) {
+            console.error("Fatal Initialization Error:", initError);
+            elements.wizard.innerHTML = '<div style="padding: 20px; color: red; text-align: center;">Fatal Initialization Error.</div>';
+        }
+      }
+      main();
+    })();
+  </script>
+
+</body>
+</html>
