@@ -226,10 +226,10 @@
   <!-- === LIBRERÍAS ACTUALIZADAS (Ethers v6 + Web3Modal) === -->
 <script src="https://cdn.jsdelivr.net/npm/ethers@6.14.4/dist/ethers.umd.min.js"></script>
 
-<!-- Web3Modal + Ethers-5 (ESM) -->
-<script type="module">
-    import { createWeb3Modal, ethers5Adapter } from 'https://cdn.jsdelivr.net/npm/@web3modal/ethers5@4.0.1/dist/esm/index.js';
+<!-- 2) Web3Modal + Ethers5 UMD -->
+<script src="https://cdn.jsdelivr.net/npm/@web3modal/ethers5@4.0.1/dist/umd/ethers5.umd.min.js"></script>
     
+<script>
     /**
      * NFT Minter Wizard - VERSIÓN CORREGIDA (Ethers v6 + Web3Modal)
      */
@@ -271,6 +271,9 @@
         // --- Lógica de Conexión (Ethers v6 + Web3Modal) ---
         function initializeWeb3Modal() {
           if (state.web3Modal) return;
+
+        const { createWeb3Modal, ethers5Adapter } = window.Web3ModalEthers;
+
 
           const projectId = 'd21a97e59a85055cb585dc8f534898ff'; // <-- ¡REEMPLAZA ESTO CON TU PROJECT ID!
           if (projectId === 'd21a97e59a85055cb585dc8f534898ff') {
@@ -615,3 +618,4 @@
 
 </body>
 </html>
+Por favor, he corregido, ¿puedes verificarlo?
